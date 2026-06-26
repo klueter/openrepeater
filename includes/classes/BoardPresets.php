@@ -23,7 +23,7 @@ class BoardPresets {
 
 
 	private function orp_helper_call($section, $subfunc) {
-		return shell_exec( "sudo orp_helper " . trim($section) . " " . trim($subfunc) );
+		return shell_exec('sudo orp_helper ' . escapeshellarg(trim($section)) . ' ' . escapeshellarg(trim($subfunc)));
 	}
 
 

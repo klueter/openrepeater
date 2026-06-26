@@ -31,18 +31,24 @@ if(isset($_POST)==true && empty($_POST)==false) {
 
 	foreach($portLabel as $a => $b) {
 		$newPortNum = $a+1;
-		
+
 		// Write settings into Port DB Table
-		$sql = "INSERT INTO ports (portNum,portLabel,rxMode,rxGPIO,txGPIO,rxAudioDev,txAudioDev,rxGPIO_active,txGPIO_active) VALUES ('$newPortNum','$portLabel[$a]','$rxMode[$a]','$rxGPIO[$a]','$txGPIO[$a]','$rxAudioDev[$a]','$txAudioDev[$a]','$rxGPIO_active[$a]','$txGPIO_active[$a]')";
-		$Database->update($sql);	
-		
+		$Database->execute_prepared(
+			"INSERT INTO ports (portNum,portLabel,rxMode,rxGPIO,txGPIO,rxAudioDev,txAudioDev,rxGPIO_active,txGPIO_active) VALUES (:portNum,:portLabel,:rxMode,:rxGPIO,:txGPIO,:rxAudioDev,:txAudioDev,:rxGPIO_active,:txGPIO_active)",
+			[':portNum' => $newPortNum, ':portLabel' => $portLabel[$a], ':rxMode' => $rxMode[$a], ':rxGPIO' => $rxGPIO[$a], ':txGPIO' => $txGPIO[$a], ':rxAudioDev' => $rxAudioDev[$a], ':txAudioDev' => $txAudioDev[$a], ':rxGPIO_active' => $rxGPIO_active[$a], ':txGPIO_active' => $txGPIO_active[$a]]
+		);
+
 		// Write RX pin to GPIO Pin table in DB
-		$gpio_rx = "INSERT INTO gpio_pins (gpio_num,direction,active,description,type) VALUES ('$rxGPIO[$a]','in','$rxGPIO_active[$a]','PORT $newPortNum RX: $portLabel[$a]','Port');";
-		$Database->update($gpio_rx);	
-		
+		$Database->execute_prepared(
+			"INSERT INTO gpio_pins (gpio_num,direction,active,description,type) VALUES (:gpio,:dir,:active,:desc,:type)",
+			[':gpio' => $rxGPIO[$a], ':dir' => 'in', ':active' => $rxGPIO_active[$a], ':desc' => "PORT $newPortNum RX: " . $portLabel[$a], ':type' => 'Port']
+		);
+
 		// Write TX pin to GPIO Pin table in DB
-		$gpio_tx = "INSERT INTO gpio_pins (gpio_num,direction,active,description,type) VALUES ('$txGPIO[$a]','out','$txGPIO_active[$a]','PORT $newPortNum TX: $portLabel[$a]','Port');";
-		$Database->update($gpio_tx);	
+		$Database->execute_prepared(
+			"INSERT INTO gpio_pins (gpio_num,direction,active,description,type) VALUES (:gpio,:dir,:active,:desc,:type)",
+			[':gpio' => $txGPIO[$a], ':dir' => 'out', ':active' => $txGPIO_active[$a], ':desc' => "PORT $newPortNum TX: " . $portLabel[$a], ':type' => 'Port']
+		);
 	}
 
 	return true;

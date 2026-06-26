@@ -66,7 +66,7 @@ class BackupRestore {
 		$this->Database->db_export( $this->db_tables, $sql_file );
 
 		// Backup of ALSA settings
-		exec('sudo orp_helper alsa backup "' . $this->archive_build_dir . $this->alsa_state_file . '"');
+		exec('sudo orp_helper alsa backup ' . escapeshellarg($this->archive_build_dir . $this->alsa_state_file));
 
 		// Add build files to archive, including sounds, then package as ORP file
 		$this->build_archive();
@@ -99,6 +99,7 @@ class BackupRestore {
 	public function pre_restore_validation($selected_restore_file) {
 		$data = [];
 		$errorLevel = 0;
+		$selected_restore_file = basename($selected_restore_file);
 
 		// Check full file path exists before continuing
 		if (!file_exists($this->backupPath . $selected_restore_file)) {
@@ -161,13 +162,13 @@ class BackupRestore {
 		// If Courtesy Tones exist in backup, then restore
 		if (file_exists($restore_courtesy_tones)) {
 			$this->removeDirectory($existing_courtesy_tones);
-			exec("cp $restore_courtesy_tones $existing_courtesy_tones -R");
+			exec('cp ' . escapeshellarg($restore_courtesy_tones) . ' ' . escapeshellarg($existing_courtesy_tones) . ' -R');
 		}
 
 		// If Identification exist in backup, then restore
 		if (file_exists($restore_identification)) {
 			$this->removeDirectory($existing_identification);
-			exec("cp $restore_identification $existing_identification -R");
+			exec('cp ' . escapeshellarg($restore_identification) . ' ' . escapeshellarg($existing_identification) . ' -R');
 		}
 
 
@@ -189,7 +190,7 @@ class BackupRestore {
 			$mod_folder_list  = glob($restore_module_path . '*', GLOB_ONLYDIR);
 			foreach($mod_folder_list as $mod_path) {
 				$mod_name = basename($mod_path);
-				exec('cp "' . $mod_path . '" "' . $this->Modules->modules_path . $mod_name . '" -R');			
+				exec('cp ' . escapeshellarg($mod_path) . ' ' . escapeshellarg($this->Modules->modules_path . $mod_name) . ' -R');			
 
 				// Init module just to create symlinks. DB will get overwritten below
 				$this->Modules->initialize_module($mod_name, 0);
@@ -201,7 +202,7 @@ class BackupRestore {
 
 		// Restoration of ALSA settings
 		if (file_exists($this->backup_restore_dir . $this->alsa_state_file)) {
-			exec('sudo orp_helper alsa restore "' . $this->backup_restore_dir . $this->alsa_state_file . '"');
+			exec('sudo orp_helper alsa restore ' . escapeshellarg($this->backup_restore_dir . $this->alsa_state_file));
 		}
 
 		// Empty affected DB tables and import SQL file to DB.
@@ -248,7 +249,7 @@ class BackupRestore {
 				if (!file_exists($mod_build_dir)) { mkdir($mod_build_dir, 0777, true); }
 	
 				foreach($non_core_modules as $mod_name => $mod_path) {
-					exec('cp "' . $mod_path . '" "' . $mod_build_dir . '/' . $mod_name . '" -R');			
+					exec('cp ' . escapeshellarg($mod_path) . ' ' . escapeshellarg($mod_build_dir . '/' . $mod_name) . ' -R');			
 				}
 				$archive->buildFromDirectory($this->archive_build_dir . 'mod_build/');				
 			}
@@ -350,7 +351,7 @@ class BackupRestore {
 			$temp_ext = explode(".", $fileNameArray['name'][$i]);
 			$extension = end($temp_ext);
 
-			$currFile = $this->backupPath . str_replace(" ","_",$fileNameArray['name'][$i]);
+			$currFile = $this->backupPath . str_replace(" ","_", basename($fileNameArray['name'][$i]));
 			
 
 			# Check File Size isn't too large
@@ -527,6 +528,7 @@ class BackupRestore {
 	###############################################
 
 	public function deleteBackup($file) {
+		$file = basename($file);
 	    unlink($this->backupPath . $file);
 
 		if (!file_exists($this->backupPath . $file)) {
@@ -565,7 +567,7 @@ class BackupRestore {
 		}
 		rmdir($path);
 */
-		exec('rm ' . $path . ' -R');
+		exec('rm ' . escapeshellarg($path) . ' -R');
 		return;
 	}
 

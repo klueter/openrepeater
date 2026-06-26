@@ -352,7 +352,7 @@ class AudioFiles {
 	###############################################
 
 	private function convert_audio($source, $destination) {
-		$soxCommand = 'sox "' . $source . '" -r16000 -b16 -esigned-integer -c1 "' . $destination . '"';
+		$soxCommand = 'sox ' . escapeshellarg($source) . ' -r16000 -b16 -esigned-integer -c1 ' . escapeshellarg($destination);
 		exec($soxCommand);
 
 		if (file_exists($destination)) {

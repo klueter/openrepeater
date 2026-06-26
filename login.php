@@ -42,25 +42,12 @@ if (isset($_POST['action'])){
 		}
 
 		$usr = $_SESSION['username'];
-		$resetQuery = "SELECT username, salt FROM users WHERE username = '$usr';";
- 		$resetData = $Database->select_single($resetQuery);
-		if (!$resetData['salt']){
-			header('location: login.php?action=setPassword');
-		}
+		$hash = password_hash($password1, PASSWORD_BCRYPT);
 
-		$resetHash = hash('sha256', $salt . hash('sha256', $password1));
-		$hash = hash('sha256', $password1);
-
-		function createSalt(){
-			$string = md5(uniqid(rand(), true));
-			return substr($string, 0, 8);
-		}
-
-		$salt = createSalt();
-		$hash = hash('sha256', $salt . $hash);
-
-		$updateSQL = "UPDATE users SET password='$hash', salt='$salt' WHERE username='$usr'";
-		$Database->update($updateSQL);
+		$Database->execute_prepared(
+			"UPDATE users SET password=:hash, salt='' WHERE username=:usr",
+			[':hash' => $hash, ':usr' => $usr]
+		);
 
 		$_SESSION = array();
 		session_destroy();
@@ -74,22 +61,37 @@ if (isset($_POST['action'])){
 ###############################################
 
 if ((isset($_POST['username'])) && (isset($_POST['password']))){
-	$username = SQLite3::escapeString($_POST['username']);
-	$password = SQLite3::escapeString($_POST['password']);
+	$username = $_POST['username'];
+	$password = $_POST['password'];
 
-	$loginQuery = "SELECT UserID, password, salt FROM users WHERE username = '$username';";
-	$loginData = $Database->select_single($loginQuery);
-	
-	// User Doesn't Exist
-	if (!$loginData['salt']){
+	$db = new SQLite3('/var/lib/openrepeater/db/openrepeater.db') or die('Unable to open database');
+	$stmt = $db->prepare("SELECT UserID, password, salt FROM users WHERE username = :user");
+	$stmt->bindValue(':user', $username);
+	$loginData = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
+	$db->close();
+
+	if (!$loginData) {
 		header('location: login.php?error=incorrectLogin');
+		die();
 	}
 
-	// User Exists - pull info from DB to compare to submitted credentials
-	$loginHash = hash('sha256', $loginData['salt'] . hash('sha256', $password));
-	if ($loginHash != $loginData['password']){
-		header('location: login.php?error=incorrectLogin');
+	// Support bcrypt (new) and legacy SHA256 (existing)
+	$authenticated = false;
+	if (substr($loginData['password'], 0, 4) === '$2y$') {
+		$authenticated = password_verify($password, $loginData['password']);
+	} else {
+		$loginHash = hash('sha256', $loginData['salt'] . hash('sha256', $password));
+		$authenticated = hash_equals($loginData['password'], $loginHash);
+		// Rehash to bcrypt on successful legacy login
+		if ($authenticated) {
+			$newHash = password_hash($password, PASSWORD_BCRYPT);
+			$Database->execute_prepared("UPDATE users SET password=:hash, salt='' WHERE username=:usr", [':hash' => $newHash, ':usr' => $username]);
+		}
+	}
 
+	if (!$authenticated) {
+		header('location: login.php?error=incorrectLogin');
+		die();
 	} else {
 		session_regenerate_id();
 		$_SESSION['username'] = $username;

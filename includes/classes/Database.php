@@ -64,9 +64,15 @@ class Database {
 
 	// VALUE EXISTS - Return True/False
 	public function exists($table, $column, $value) {
+		$allowed_tables = ['settings', 'ports', 'gpio_pins', 'modules', 'ctcss', 'advanced', 'version_info', 'users'];
+		$allowed_columns = ['keyID', 'portNum', 'gpio_num', 'moduleKey', 'toneFreqHz', 'username', 'value'];
+		if (!in_array($table, $allowed_tables) || !in_array($column, $allowed_columns)) {
+			die('Invalid table or column name');
+		}
 		$db = new SQLite3($this->db_loc) or die('Unable to open database');
-		$sql = 'SELECT COUNT(*) FROM "'.$table.'" WHERE "'.$column.'" = "'.$value.'";';
-		$result = $db->querySingle($sql, true) or die('Unable to locate value in database');
+		$stmt = $db->prepare('SELECT COUNT(*) FROM "' . $table . '" WHERE "' . $column . '" = :val');
+		$stmt->bindValue(':val', $value);
+		$result = $stmt->execute()->fetchArray();
 		if ( $result['COUNT(*)'] > 0 ) { return true; } else { return false; }
 	}
 
@@ -74,7 +80,7 @@ class Database {
 	public function insert($sql) {
 		$db = new SQLite3($this->db_loc) or die('Unable to open database');
 		$results = $db->query($sql) or die('Unable to insert record into database.');
-		if ( $db->changes() > 0 ) { 
+		if ( $db->changes() > 0 ) {
 			$this->set_update_flag(true);
 			return true;
 		} else {
@@ -86,12 +92,32 @@ class Database {
 	public function update($sql) {
 		$db = new SQLite3($this->db_loc) or die('Unable to open database');
 		$results = $db->query($sql) or die('Unable to update database.');
-		if ( $db->changes() > 0 ) { 
+		if ( $db->changes() > 0 ) {
 			$this->set_update_flag(true);
 			return true;
 		} else {
 			return false;
 		}
+	}
+
+	// PREPARED STATEMENT - Execute parameterized query, return True/False
+	public function execute_prepared($sql, $params = []) {
+		$db = new SQLite3($this->db_loc) or die('Unable to open database');
+		$stmt = $db->prepare($sql);
+		if (!$stmt) { die('Unable to prepare statement.'); }
+		foreach ($params as $param => $value) {
+			$stmt->bindValue($param, $value);
+		}
+		$result = $stmt->execute();
+		if (!$result) { die('Unable to execute prepared statement.'); }
+		$changes = $db->changes();
+		$stmt->close();
+		$db->close();
+		if ($changes > 0) {
+			$this->set_update_flag(true);
+			return true;
+		}
+		return false;
 	}
 
 	// DELETE ROW - Return True/False
@@ -115,9 +141,11 @@ class Database {
 			return $results;
 		} else {
 			// Return requested setting value as string
-			$sql = "SELECT * FROM settings WHERE keyID = '".$returnSetting."'";
-			$results = $this->select_single($sql, 'keyID', 'value');
-			return $results['value'];
+			$db = new SQLite3($this->db_loc) or die('Unable to open database');
+			$stmt = $db->prepare("SELECT * FROM settings WHERE keyID = :key");
+			$stmt->bindValue(':key', $returnSetting);
+			$results = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
+			return $results ? $results['value'] : null;
 		}
 	}
 	
@@ -200,34 +228,30 @@ class Database {
 
 	public function active_module($id = NULL) {
 		if(isset($id)) {
-			// Target Module
-			$sql = "UPDATE modules SET moduleEnabled='1' WHERE moduleKey='$id'";
+			return $this->execute_prepared("UPDATE modules SET moduleEnabled='1' WHERE moduleKey=:id", [':id' => $id]);
 		} else {
-			// Deactivate ALL Modules
 			$sql = "UPDATE modules SET moduleEnabled='1'";
+			return $this->insert($sql);
 		}
-		$results = $this->insert($sql);
-		return $results;
 	}
 
 
 	public function deactive_module($id = NULL) {
 		if(isset($id)) {
-			// Target Module
-			$sql = "UPDATE modules SET moduleEnabled='0' WHERE moduleKey='$id'";
+			return $this->execute_prepared("UPDATE modules SET moduleEnabled='0' WHERE moduleKey=:id", [':id' => $id]);
 		} else {
-			// Deactivate ALL Modules
 			$sql = "UPDATE modules SET moduleEnabled='0'";
+			return $this->insert($sql);
 		}
-		$results = $this->insert($sql);
-		return $results;
 	}
 
 
 	public function update_preset_modules( $input_array = array() ) {
-		foreach($input_array as $moduleArray){  
-			$sql = "UPDATE modules SET moduleEnabled='1', moduleOptions='".$moduleArray['moduleOptions']."' WHERE moduleKey='".$moduleArray['moduleKey']."';";
-			$results = $this->insert($sql);
+		foreach($input_array as $moduleArray){
+			$this->execute_prepared(
+				"UPDATE modules SET moduleEnabled='1', moduleOptions=:opts WHERE moduleKey=:key",
+				[':opts' => $moduleArray['moduleOptions'], ':key' => $moduleArray['moduleKey']]
+			);
 		}
 	}
 
@@ -263,20 +287,19 @@ class Database {
 	###############################################
 
 	public function db_export($db_tables, $sql_file) {
+		$allowed_tables = ['settings', 'gpio_pins', 'ports', 'modules'];
 		$orp_version = $this->get_version();
 
 		// SQL File Header, start file
-		$sql_file_header = str_repeat('-',80) . "\n-- OpenRepeater Backup (ver $orp_version)\n" . str_repeat('-',80);
-		exec('echo "' . $sql_file_header . '"  > ' . $sql_file);
+		$header = str_repeat('-',80) . "\n-- OpenRepeater Backup (ver $orp_version)\n" . str_repeat('-',80) . "\n";
+		file_put_contents($sql_file, $header);
 
 		// Loop through each table
 		foreach ($db_tables as $cur_table) {
-			// Section Header
-			$sql_section_header = "\n\n" . str_repeat('-',80) . "\n-- Table: $cur_table\n" . str_repeat('-',80);
-			exec('echo "' . $sql_section_header . '"  >> ' . $sql_file);
-
-			// Dump current table
-			exec('sqlite3 ' . $this->db_loc . ' ".dump ' . $cur_table . '" >> ' . $sql_file);
+			if (!in_array($cur_table, $allowed_tables)) { continue; }
+			$section = "\n\n" . str_repeat('-',80) . "\n-- Table: $cur_table\n" . str_repeat('-',80) . "\n";
+			file_put_contents($sql_file, $section, FILE_APPEND);
+			exec('sqlite3 ' . escapeshellarg($this->db_loc) . ' ' . escapeshellarg(".dump $cur_table") . ' >> ' . escapeshellarg($sql_file));
 		}
 
 	}
@@ -288,16 +311,15 @@ class Database {
 	###############################################
 
 	public function db_import($db_tables, $sql_file) {
-		// Empty Afected Tabled
+		$allowed_tables = ['settings', 'gpio_pins', 'ports', 'modules'];
 		$db = new SQLite3($this->db_loc) or die('Unable to open database');
-		// Loop through each table
 		foreach ($db_tables as $cur_table) {
-			$db->query("DELETE FROM $cur_table;") or die('Unable to delete current record.');
+			if (!in_array($cur_table, $allowed_tables)) { continue; }
+			$db->query("DELETE FROM " . $cur_table . ";") or die('Unable to delete current record.');
 		}
 		$db->close();
 
-		// Import SQL file
-		exec('cat ' . $sql_file . ' | sqlite3 ' . $this->db_loc);
+		exec('cat ' . escapeshellarg($sql_file) . ' | sqlite3 ' . escapeshellarg($this->db_loc));
 	}
 
 

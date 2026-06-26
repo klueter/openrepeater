@@ -46,10 +46,13 @@ if (isset($_POST['action'])){
 
 
 	} else if ($_POST['action'] == "update_advanced") {
-		foreach($_POST as $key=>$value){  
-			if ($key != "action") {
-				$sql = "INSERT OR REPLACE INTO advanced (keyID, value) VALUES ('$key', '$value');";
-				$query = $Database->insert($sql);
+		$allowed_advanced_keys = ['svxlink_config', 'gpio_config'];
+		foreach($_POST as $key=>$value){
+			if ($key != "action" && in_array($key, $allowed_advanced_keys, true)) {
+				$query = $Database->execute_prepared(
+					"INSERT OR REPLACE INTO advanced (keyID, value) VALUES (:key, :val)",
+					[':key' => $key, ':val' => $value]
+				);
 			}
 		}
 		

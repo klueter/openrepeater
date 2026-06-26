@@ -269,7 +269,7 @@ class Modules {
 			}
 
 			// Clean up any Mac OS trash in user zip file if it exists
-			exec('zip -d '.$selected_archive.' "__MACOSX*"');
+			exec('zip -d ' . escapeshellarg($selected_archive) . ' "__MACOSX*"');
 
 			$zip = new ZipArchive;
 			$res = $zip->open($selected_archive);
@@ -284,8 +284,8 @@ class Modules {
 				if (count($folder_list) == 1 && $file_count == 0) {
 					$get_sub_dir = glob($this->modulesUploadTempDir."*", GLOB_ONLYDIR);
 					$get_sub_dir = $get_sub_dir[0];
-					exec('mv ' . $get_sub_dir . '/* ' . $this->modulesUploadTempDir);
-					exec('rm ' . $get_sub_dir . ' -R');
+					exec('mv ' . escapeshellarg($get_sub_dir) . '/* ' . escapeshellarg($this->modulesUploadTempDir));
+					exec('rm ' . escapeshellarg($get_sub_dir) . ' -R');
 				}
 
 				return true;
@@ -349,7 +349,7 @@ class Modules {
 			$svxlink_sounds_path = $this->svxlink_sounds . $svxlink_name;
 			$mod_sounds_path = $this->modules_path . $svxlink_name . '/svxlink/sounds/en_US/';
 			if (file_exists($mod_sounds_path)) {
-				if (file_exists($svxlink_sounds_path)) { exec('rm ' . $svxlink_sounds_path . ' -R'); }
+				if (file_exists($svxlink_sounds_path)) { exec('rm ' . escapeshellarg($svxlink_sounds_path) . ' -R'); }
 				symlink($mod_sounds_path, $svxlink_sounds_path); // Set New Link
 			}
 
@@ -399,7 +399,7 @@ class Modules {
 		if (!file_exists($modules_d_path)) { $error_level++; }
 
 		if ($error_level > 0) {
-			exec('rm ' . $tempModulePath. ' -R');
+			exec('rm ' . escapeshellarg($tempModulePath) . ' -R');
 			return false;
 		}
 
@@ -414,7 +414,7 @@ class Modules {
 			$svxlink_name = trim($mod_ini_array['Module_Info']['mod_name']);
 			$new_module_path = $this->modules_path . $svxlink_name;
 		} else {
-			exec('rm ' . $tempModulePath. ' -R');
+			exec('rm ' . escapeshellarg($tempModulePath) . ' -R');
 			return false;			
 		}
 		
@@ -422,7 +422,7 @@ class Modules {
 		if (file_exists($new_module_path)) { $error_level++; }
 
 		if ($error_level > 0) {
-			exec('rm ' . $tempModulePath. ' -R');
+			exec('rm ' . escapeshellarg($tempModulePath) . ' -R');
 			return false;
 		}
 		
@@ -432,7 +432,7 @@ class Modules {
 		if (!file_exists($new_module_path)) { $error_level++; }
 
 		if ($error_level > 0) {
-			exec('rm ' . $tempModulePath. ' -R');
+			exec('rm ' . escapeshellarg($tempModulePath) . ' -R');
 			return false;
 		}
 		
@@ -440,7 +440,7 @@ class Modules {
 		$this->initialize_module($svxlink_name, 0);
 
 		# Final Cleanup
-		if (file_exists($tempModulePath)) { exec('rm ' . $tempModulePath. ' -R'); }
+		if (file_exists($tempModulePath)) { exec('rm ' . escapeshellarg($tempModulePath) . ' -R'); }
 		
 		return $mod_ini_array;
 
@@ -491,12 +491,12 @@ class Modules {
 		$svxlink_sounds_path = $this->svxlink_sounds . $svxlink_name;
 		$mod_sounds_path = $this->modules_path . $svxlink_name . '/svxlink/sounds/en_US/';
 		if (file_exists($mod_sounds_path)) {
-			if (file_exists($svxlink_sounds_path)) { exec('rm ' . $svxlink_sounds_path . ' -R'); }
+			if (file_exists($svxlink_sounds_path)) { exec('rm ' . escapeshellarg($svxlink_sounds_path) . ' -R'); }
 		}
 
 		### Remove module dir ###
 		
-		exec('rm ' . $this->modules_path . $svxlink_name . ' -R');
+		exec('rm ' . escapeshellarg($this->modules_path . $svxlink_name) . ' -R');
 		if ( !file_exists( $this->modules_path . $svxlink_name ) ) {
 
 		### Remove GPIO pins if module uses them ###
